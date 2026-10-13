@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#101511">
+<title>Goaler — Make today count</title>
+<style>
+:root{color-scheme:dark;--bg:#0d110e;--panel:#171e19;--panel2:#202a23;--line:#2c3a30;--green:#a6e8b4;--muted:#a9b8ac;--white:#f3f7f3;--red:#ffb4ab}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#1b2b20 0,#0d110e 48%);font:16px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;color:var(--white);min-height:100vh}
+main{max-width:760px;margin:auto;padding:24px 16px 48px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:24px}.brand{font-weight:900;letter-spacing:.16em;color:var(--green);font-size:1.05rem}.tag{font-size:.78rem;border:1px solid var(--line);border-radius:999px;padding:6px 10px;color:var(--muted)}
+h1{font-size:clamp(2rem,7vw,3.3rem);line-height:1.02;margin:8px 0 12px;letter-spacing:-.04em}p{color:var(--muted);margin:0}.hero{margin-bottom:24px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:20px 0}.stat,.panel,.goal{background:rgba(23,30,25,.92);border:1px solid var(--line);border-radius:18px;padding:16px}.stat small{display:block;color:var(--muted);font-size:.75rem}.stat strong{display:block;font-size:1.45rem;margin-top:5px}.stat strong span{color:var(--green)}h2{font-size:1.08rem;margin:0 0 14px}.panel{margin:14px 0}.formgrid{display:grid;grid-template-columns:1fr 130px;gap:10px}label{display:block;font-size:.82rem;color:var(--muted);margin-bottom:6px}input,select,button{font:inherit}input,select{width:100%;background:#0e1510;color:var(--white);border:1px solid #39493d;border-radius:11px;padding:12px;min-height:46px}input:focus,select:focus{outline:2px solid var(--green);outline-offset:1px}.field{margin-bottom:12px}.primary,.secondary,.danger{border:0;border-radius:11px;padding:12px 15px;min-height:44px;font-weight:750;cursor:pointer}.primary{background:var(--green);color:#102015}.secondary{background:var(--panel2);color:var(--white);border:1px solid var(--line)}.danger{background:#35201f;color:var(--red);border:1px solid #59312d}.full{width:100%}.goal-list{display:grid;gap:10px}.goal-top{display:flex;justify-content:space-between;align-items:start;gap:12px}.goal-title{font-weight:750;overflow-wrap:anywhere}.reward{white-space:nowrap;color:var(--green);font-weight:750;font-size:.88rem}.meta{font-size:.82rem;color:var(--muted);margin-top:5px}.progress{height:7px;background:#303c33;border-radius:99px;overflow:hidden;margin:13px 0}.progress span{height:100%;display:block;background:var(--green);width:0%;transition:width .2s}.actions{display:flex;gap:8px;flex-wrap:wrap}.actions button{flex:1}.empty{border:1px dashed #405044;border-radius:14px;padding:24px;text-align:center;color:var(--muted)}.note{font-size:.78rem;color:var(--muted);margin-top:16px}.toast{min-height:22px;color:var(--green);font-size:.9rem;margin-top:10px}.footer{margin-top:28px;font-size:.78rem;color:var(--muted);text-align:center}
+@media(max-width:440px){.stats{gap:7px}.stat{padding:12px}.stat strong{font-size:1.2rem}.formgrid{grid-template-columns:1fr 100px}.panel{padding:13px}.actions button{font-size:.85rem;padding:10px 8px}}
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><div class="brand">GOALER</div><div class="tag">Prototype 0.1 · Local mode</div></div>
+  <section class="hero">
+    <p>YOUR DAY, YOUR RULES</p>
+    <h1>Make today<br>count.</h1>
+    <p>Small wins become big momentum. Pick a goal and get moving.</p>
+  </section>
+  <section class="stats" aria-label="Your stats">
+    <div class="stat"><small>Available coins</small><strong><span id="coins">0</span> ✦</strong></div>
+    <div class="stat"><small>Active goals</small><strong id="activeCount">0</strong></div>
+    <div class="stat"><small>Completed</small><strong id="doneCount">0</strong></div>
+  </section>
+  <section class="panel">
+    <h2>＋ Create a goal</h2>
+    <form id="goalForm">
+      <div class="field"><label for="goalName">What's your mission?</label><input id="goalName" maxlength="80" placeholder="e.g. Study Science" required></div>
+      <div class="formgrid">
+        <div class="field"><label for="minutes">Focus time (minutes)</label><input id="minutes" type="number" min="1" max="600" value="30" required></div>
+        <div class="field"><label for="reward">Reward coins</label><input id="reward" type="number" min="1" max="1000" value="25" required></div>
+      </div>
+      <button class="primary full" type="submit">Add to my missions</button>
+    </form>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </section>
+  <section class="panel">
+    <h2>🎯 Your missions</h2>
+    <div id="goalList" class="goal-list"></div>
+  </section>
+  <section class="panel">
+    <h2>🔒 Reward vault</h2>
+    <p id="vaultText">Your coins are waiting. Complete a goal to earn your first reward.</p>
+    <p class="note">Prototype note: coins are demo points, not money. Data is saved only in this browser on this device. Clearing browser data may erase it.</p>
+  </section>
+  <div class="footer">Built for progress, not perfection. 💚</div>
+</main>
+<script>
+const STORAGE_KEY = "goaler-prototype-v1";
+const $ = (id) => document.getElementById(id);
+let state = loadState();
+
+function loadState(){
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (saved && Array.isArray(saved.goals) && Number.isFinite(saved.coins)) return saved;
+  } catch (e) {}
+  return { coins: 0, goals: [] };
+}
+function saveState(){
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return true;
+  } catch (e) {
+    showToast("Couldn't save. Your browser storage may be unavailable.");
+    return false;
+  }
+}
+function showToast(message){ $("toast").textContent = message; }
+function escapeHTML(value){
+  return String(value).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function render(){
+  $("coins").textContent = state.coins;
+  $("activeCount").textContent = state.goals.filter(g => !g.completed).length;
+  $("doneCount").textContent = state.goals.filter(g => g.completed).length;
+  const list = $("goalList");
+  if (!state.goals.length) {
+    list.innerHTML = '<div class="empty">No missions yet.<br>Add your first goal above. You’ve got this.</div>';
+  } else {
+    list.innerHTML = state.goals.map(g => `
+      <article class="goal">
+        <div class="goal-top">
+          <div><div class="goal-title">${escapeHTML(g.name)}</div><div class="meta">${g.minutes} min focus session · ${g.completed ? "Completed" : "Ready when you are"}</div></div>
+          <div class="reward">+${g.reward} ✦</div>
+        </div>
+        <div class="progress"><span style="width:${g.completed ? 100 : 0}%"></span></div>
+        <div class="actions">
+          ${g.completed ? '<button class="secondary" disabled>✓ Earned</button>' : `<button class="primary" data-complete="${g.id}">Complete goal</button>`}
+          <button class="secondary" data-delete="${g.id}" aria-label="Delete ${escapeHTML(g.name)}">Delete</button>
+        </div>
+      </article>`).join("");
+  }
+  $("vaultText").textContent = state.coins >= 100
+    ? `Nice! You have ${state.coins} coins. In a future version, you can spend coins on rewards you choose.`
+    : `You have ${state.coins} coins. Earn ${100 - state.coins} more to reach the demo milestone of 100 coins.`;
+}
+$("goalForm").addEventListener("submit", event => {
+  event.preventDefault();
+  const name = $("goalName").value.trim();
+  const minutes = Number($("minutes").value);
+  const reward = Number($("reward").value);
+  if (!name || !Number.isInteger(minutes) || minutes < 1 || minutes > 600 || !Number.isInteger(reward) || reward < 1 || reward > 1000) {
+    showToast("Enter a goal, 1–600 minutes, and 1–1000 coins.");
+    return;
+  }
+  state.goals.unshift({id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()), name, minutes, reward, completed: false});
+  if (saveState()) {
+    $("goalForm").reset(); $("minutes").value = 30; $("reward").value = 25;
+    showToast("Mission added. One small step starts now!"); render();
+  }
+});
+$("goalList").addEventListener("click", event => {
+  const completeButton = event.target.closest("[data-complete]");
+  const deleteButton = event.target.closest("[data-delete]");
+  if (completeButton) {
+    const goal = state.goals.find(g => g.id === completeButton.dataset.complete);
+    if (goal && !goal.completed) {
+      goal.completed = true;
+      state.coins += goal.reward;
+      if (saveState()) { showToast(`Goal completed — ${goal.reward} coins added!`); render(); }
+    }
+  }
+  if (deleteButton) {
+    const id = deleteButton.dataset.delete;
+    state.goals = state.goals.filter(g => g.id !== id);
+    if (saveState()) { showToast("Mission deleted."); render(); }
+  }
+});
+render();
+</script>
+</body>
+</html>
